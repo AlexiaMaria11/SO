@@ -39,19 +39,21 @@ int read_line(char *text, int size)
 
 int isValidFloat(char* str) {
     int i = 0;
-    int hasDot=0;
+    int hasDot = 0;
     int hasDigit = 0;
+
     while (str[i] != '\0') {
         if (isdigit(str[i])) {
-            hasDigit = 1;
+            hasDigit = 1; 
         } else if (str[i] == '.' && !hasDot) {
-            hasDot = 1;
+            hasDot = 1; 
+        } else if (str[i] == '-' && i == 0) {
         } else {
-            return 0;
+            return 0; 
         }
         i++;
     }
-    return hasDigit;
+    return hasDigit && (hasDot || i > 0);
 }
 
 TREASURE* newTreasure()
@@ -62,7 +64,7 @@ TREASURE* newTreasure()
       perror("Error allocating space for a treasure\n");
       exit(EXIT_FAILURE);
     }
-  char buff_in[16], buff_out[256];
+  char buff_in[32], buff_out[256];
 
   //intrebare daca se introduc date gresite asteptam date corecte sau iesim din program
   
@@ -92,31 +94,23 @@ TREASURE* newTreasure()
   strcpy(buff_out, "Latitude: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(atoi(buff_in))
-    new->gps.latitude=atoi(buff_in);
-  else
-    if(isValidFloat(buff_in)==0)
-      {
-	perror("Invalid latitude(float)\n");
-	exit(EXIT_FAILURE);
-      }
-    else
-      new->gps.latitude=atof(buff_in);
+  if(isValidFloat(buff_in)==0)
+  {
+    perror("Invalid latitude\n");
+    exit(EXIT_FAILURE);
+  }
+  new->gps.latitude=atof(buff_in);
   memset(buff_in, 0, sizeof(buff_in));
 
   strcpy(buff_out, "Longitude: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(atoi(buff_in))
-    new->gps.longitude=atoi(buff_in);
-  else
-    if(isValidFloat(buff_in)==0)
-      {
-	perror("Invalid longitude(float)\n");
-	exit(EXIT_FAILURE);
-      }
-    else
-      new->gps.longitude=atof(buff_in);
+  if(isValidFloat(buff_in)==0)
+  {
+    perror("Invalid longitude\n");
+    exit(EXIT_FAILURE);
+  }
+  new->gps.longitude=atof(buff_in);
   memset(buff_in, 0, sizeof(buff_in));
 
   strcpy(buff_out, "Clue: ");
@@ -164,16 +158,16 @@ void add(char *hunt)
 	}
     }
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-  snprintf(log, sizeof(log), "%s/logged", hunt);
-  snprintf(link, sizeof(link), "logged_%s", hunt);
-  int f=open(file, O_RDWR | O_CREAT | O_APPEND, 0777);
+  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
+  snprintf(link, sizeof(link), "logged_hunt-%s", hunt);
+  int f=open(file, O_WRONLY | O_CREAT | O_APPEND, 0777);
   if(f==-1)
     {
       perror("Error at opening treasure file\n");
       exit(EXIT_FAILURE);
     }
-  TREASURE* new = newTreasure();
-  if(write(f, new, sizeof(TREASURE*))==-1)
+  TREASURE *new = newTreasure();
+  if(write(f, new, sizeof(*new))==-1)
     {
       perror("Error at writing a new feature");
       close(f);
@@ -188,7 +182,11 @@ void add(char *hunt)
     }
   char info[256];
   sprintf(info,  "--add: ID:%d User:%s Latitude:%f Longitude:%f Clue:%s Value:%d\n", new->id, new->user, new->gps.latitude, new->gps.longitude, new->clue, new->value);
-  write(lo, info, strlen(info));
+  if(write(lo, info, strlen(info))==-1)
+  {
+    perror("Error writing to log file\n");
+    exit(EXIT_FAILURE);
+  }
   close(lo);
   free(new);
   if(lstat(link, &st)==-1)
@@ -235,12 +233,10 @@ void list(char *hunt)
   else
     if(S_ISREG(st.st_mode)==0)
       {
-	perror("It isn't a regular file\n");
-	exit(EXIT_FAILURE);
+	      perror("It isn't a regular file\n");
+	      exit(EXIT_FAILURE);
       }
   char size[64];
-
-  //intrebare putem folosi snprintf
   
   snprintf(size, sizeof(size), "\nTotal size: %ld\n", st.st_size);
   write(1, size, strlen(size));
@@ -264,7 +260,7 @@ void list(char *hunt)
     }
   close(f);
   char log[128], aux[128];
-  snprintf(log, sizeof(log), "%s/logged", hunt);
+  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
   snprintf(aux, sizeof(aux), "--list: listed all the treasures from %s\n", hunt);
   int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
   if(lo==-1)
