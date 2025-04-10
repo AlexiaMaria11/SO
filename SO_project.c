@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <ctype.h>
 #include <time.h>
 
@@ -25,12 +26,12 @@ int read_line(char *text, int size)
   if(len>0)
     {
       if(text[len-1]=='\n')
-	{
-	  text[len-1]='\0';
-	  len--;
-	}
+	    {   
+	      text[len-1]='\0';
+	      len--;
+	    }
       else
-	text[len]='\0';
+	      text[len]='\0';
     }
   else
     text[0]='\0';
@@ -152,10 +153,10 @@ void add(char *hunt)
   else
     {
       if(mkdir(dir, 0777)==-1)
-	{
-	  perror("Couldn't create a new directory\n");
-	  exit(EXIT_FAILURE);
-	}
+	    {
+	      perror("Couldn't create a new directory\n");
+	      exit(EXIT_FAILURE);
+	    }
     }
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
@@ -178,6 +179,8 @@ void add(char *hunt)
   if(lo==-1)
     {
       perror("Error at opening log file\n");
+      close(f);
+      free(new);
       exit(EXIT_FAILURE);
     }
   char info[256];
@@ -192,17 +195,17 @@ void add(char *hunt)
   if(lstat(link, &st)==-1)
     {
       if(symlink(log, link)==-1)
-	{
-	  perror("couldn't create a symlink\n");
-	  exit(EXIT_FAILURE);
-	}
+	    {
+	      perror("couldn't create a symlink\n");
+	      exit(EXIT_FAILURE);
+	    }
     }
   else
     {
       if(S_ISLNK(st.st_mode))
-	{
-	  write(1, "Symbolic link already exists\n", strlen("Symbolic link already exists\n"));
-	}
+	    {
+	      write(1, "Symbolic link already exists\n", strlen("Symbolic link already exists\n"));
+	    }
     }
   write(1, "Treasure added\n", 16);
 }
@@ -220,8 +223,8 @@ void list(char *hunt)
   else
     if(S_ISDIR(st.st_mode)==0)
       {
-	perror("It isn't a directory\n");
-	exit(EXIT_FAILURE);
+	      perror("It isn't a directory\n");
+	      exit(EXIT_FAILURE);
       }
   write(1, "Hunt: ", 6);
   write(1, hunt, strlen(hunt));
@@ -244,24 +247,99 @@ void list(char *hunt)
   snprintf(modification, sizeof(modification), "Last modification: %s", ctime(&st.st_mtime));
   write(1, modification, strlen(modification));
   TREASURE t;
-  int f=open(file, O_RDONLY);
+  int f=open(file, O_RDONLY, 0777);
   if(f==-1)
     {
       perror("Error at opening a treasure file\n");
       exit(EXIT_FAILURE);
     }
   int b;
-  while((b=read(f, &t, sizeof(TREASURE)))>0)
+  while((b=read(f, &t, sizeof(TREASURE)))==sizeof(TREASURE))
     {
       char info[256];
-      //nu afiseaza bine
-      sprintf(info,  "ID:%d User:%s Latitude:%f Longitude:%f Clue:%s Value:%d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
+      snprintf(info, sizeof(info), "ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
       write(1, info, strlen(info));
     }
   close(f);
   char log[128], aux[128];
   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
   snprintf(aux, sizeof(aux), "--list: listed all the treasures from %s\n", hunt);
+  int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
+  if(lo==-1)
+    {
+      perror("Error at opening log file\n");
+      exit(EXIT_FAILURE);
+    }
+  write(lo, aux, strlen(aux));
+  close(lo);
+}
+
+void view(char *hunt, char *id)
+{
+  if(atoi(id)==0)
+  {
+    perror("Not a valid id\n");
+    exit(EXIT_FAILURE);
+  }
+  int ID=atoi(id);
+  char file[512];
+  DIR *dir;
+  struct stat st;
+  if(lstat(hunt, &st))
+  {
+    perror("Error at finding the path\n");
+    exit(EXIT_FAILURE);
+  }
+  else 
+  {
+    dir=opendir(hunt);
+    if(dir==NULL)
+    {
+      perror("Not a directory\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+  struct dirent *d;
+  int ok=0, found_id=0;
+  while((d=readdir(dir)))
+  {
+    if(strcmp(d->d_name, "treasures.dat")==0)
+    {
+      snprintf(file, sizeof(file), "%s/%s", hunt, d->d_name);
+      int f=open(file, O_RDONLY, 0777);
+      if(f==-1)
+      {
+        perror("Couldn't open the file\n");
+        exit(EXIT_FAILURE);
+      }
+      TREASURE t;
+      while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE) && !found_id)
+      {
+        if(t.id==ID)
+        {
+          found_id=1;
+          char info[256];
+          snprintf(info, sizeof(info), "ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
+          write(1, info, strlen(info));
+        }
+      }
+      close(f);
+      ok=1;
+      break;
+    }
+  }
+  if(ok==0)
+  {
+    perror("Couldn't find the treasures file\n");
+    exit(-1);
+  }
+  if(found_id==0)
+  {
+    write(1, "ID not found\n", 14);
+  }
+  char log[128], aux[128];
+  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
+  snprintf(aux, sizeof(aux), "--view: viewed the treasure with the %d id\n", ID);
   int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
   if(lo==-1)
     {
@@ -283,18 +361,50 @@ int main(int argc, char *argv[])
       perror("You need to introduce a hunt id\n");
       exit(EXIT_FAILURE);
     }
-    add(argv[2]);
+    else if(argc==3)
+            add(argv[2]);
+          else
+          {
+            perror("Too many arguments\n");
+            exit(EXIT_FAILURE);
+          }
   }
   else
     {
       if(strcmp(argv[1], "--list")==0)
-	{
-	   if(argc<3){
-	     perror("You need to introduce a hunt id\n");
-	     exit(EXIT_FAILURE);
-	   }
-	   list(argv[2]);
-	}
+	    {
+	      if(argc<3){
+	        perror("You need to introduce a hunt id\n");
+	        exit(EXIT_FAILURE);
+	      }
+        else 
+          if(argc==3)
+	            list(argv[2]);
+          else
+          {
+            perror("Too many arguments\n");
+            exit(EXIT_FAILURE);
+          }
+	    }
+      else
+      {
+        if(strcmp(argv[1], "--view")==0)
+        {
+          if(argc<4)
+          {
+            perror("You need to introduce a hunt id AND an id\n");
+            exit(EXIT_FAILURE);
+          }
+          else
+            if(argc==4)
+              view(argv[2], argv[3]);
+            else
+            {
+              perror("Too many arguments\n");
+              exit(EXIT_FAILURE);
+            }
+        }
+      }
     }
   return 0;
 }
