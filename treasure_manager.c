@@ -436,6 +436,76 @@ void remove_treasure(char *hunt, char *id)
    write(1, "Treasure removed\n", 18);
 }
 
+void remove_hunt(char *hunt)
+{
+  char file[128], log[128], link[128];
+  snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
+  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
+  snprintf(link, sizeof(link), "logged_hunt-%s", hunt);
+  struct stat st;
+  if(lstat(hunt, &st))
+  {
+    perror("Error at finding the directory path\n");
+    exit(EXIT_FAILURE);
+  }
+  if(S_ISDIR(st.st_mode)==0)
+  {
+    perror("Not a directory\n");
+    exit(EXIT_FAILURE);
+  }
+  if(lstat(file, &st))
+  {
+    perror("Error at finding the file path\n");
+    exit(EXIT_FAILURE);
+  }
+  if(S_ISREG(st.st_mode)==0)
+  {
+    perror("Not a regular file\n");
+    exit(EXIT_FAILURE);
+  }
+  if(unlink(file))
+  {
+    perror("Error at deleting the file\n");
+    exit(EXIT_FAILURE);
+  }
+  if(lstat(link, &st))
+  {
+    perror("Error at finding the link path\n");
+    exit(EXIT_FAILURE);
+  }
+  if(S_ISLNK(st.st_mode)==0)
+  {
+    perror("Not a link\n");
+    exit(EXIT_FAILURE);
+  }
+  if(unlink(link))
+  {
+    perror("Error at deleting the link\n");
+    exit(EXIT_FAILURE);
+  }
+  if(lstat(log, &st))
+  {
+    perror("Error at finding the log path\n");
+    exit(EXIT_FAILURE);
+  }
+  if(S_ISREG(st.st_mode)==0)
+  {
+    perror("Not a regular file\n");
+    exit(EXIT_FAILURE);
+  }
+  if(unlink(log))
+  {
+    perror("Error at deleting the log file\n");
+    exit(EXIT_FAILURE);
+  }
+  if(unlink(hunt))
+  {
+    perror("Error at deleting the directory\n");
+    exit(EXIT_FAILURE);
+  }
+  write(1, "Hunt removed\n", 13);
+}
+
 int main(int argc, char *argv[])
 {
   if(argc<2){
@@ -443,17 +513,20 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
   if(strcmp(argv[1], "--add")==0){
-    if(argc<3){
+    if(argc<3)
+    {
       perror("You need to introduce a hunt id\n");
       exit(EXIT_FAILURE);
     }
-    else if(argc==3)
+    else {
+      if(argc==3)
             add(argv[2]);
-          else
-          {
-            perror("Too many arguments\n");
-            exit(EXIT_FAILURE);
-          }
+      else
+      {
+        perror("Too many arguments\n");
+        exit(EXIT_FAILURE);
+      }
+    }
   }
   else
     {
@@ -508,7 +581,27 @@ int main(int argc, char *argv[])
                         exit(EXIT_FAILURE);
                     }
             }
+            else{
+              if(strcmp(argv[1], "--remove_hunt")==0)
+              {
+                if(argc<3){
+                  perror("You need to introduce a hunt id\n");
+                  exit(EXIT_FAILURE);
+                }
+                else if(argc==3)
+                  remove_hunt(argv[2]);
+                  else
+                  {
+                    perror("Too many arguments\n");
+                    exit(EXIT_FAILURE);
+                  }
+            }
+            else
+            {
+              perror("Invalid argument\n");
+            }
         }
+      }
       }
     }
   return 0;
