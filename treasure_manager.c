@@ -498,7 +498,7 @@ void remove_hunt(char *hunt)
     perror("Error at deleting the log file\n");
     exit(EXIT_FAILURE);
   }
-  if(unlink(hunt))
+  if(rmdir(hunt))
   {
     perror("Error at deleting the directory\n");
     exit(EXIT_FAILURE);
