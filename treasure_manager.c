@@ -227,9 +227,10 @@ void add(char *hunt)
 
 void list(char *hunt)
 {
-  char file[128];
+  char file[128], log[128];
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-  struct stat st;
+  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
+  struct stat st,st1, st2;
   if(lstat(hunt, &st))
     {
       perror("Error at finding the path\n");
@@ -243,20 +244,31 @@ void list(char *hunt)
       }
   write(1, "Hunt: ", 6);
   write(1, hunt, strlen(hunt));
-  if(lstat(file, &st))
+  if(lstat(file, &st1))
     {
       perror("Error at finding the treasure file\n");
       exit(EXIT_FAILURE);
     }
   else
-    if(S_ISREG(st.st_mode)==0)
+    if(S_ISREG(st1.st_mode)==0)
+      {
+	      perror("It isn't a regular file\n");
+	      exit(EXIT_FAILURE);
+      }
+  if(lstat(log, &st2))
+    {
+      perror("Error at finding the treasure file\n");
+      exit(EXIT_FAILURE);
+    }
+  else
+    if(S_ISREG(st2.st_mode)==0)
       {
 	      perror("It isn't a regular file\n");
 	      exit(EXIT_FAILURE);
       }
   char size[64];
   
-  snprintf(size, sizeof(size), "\nTotal size: %ld\n", st.st_size);
+  snprintf(size, sizeof(size), "\nTotal size: %ld\n", st1.st_size+st2.st_size);
   write(1, size, strlen(size));
   char modification[64];
   snprintf(modification, sizeof(modification), "Last modification: %s", ctime(&st.st_mtime));
@@ -276,8 +288,7 @@ void list(char *hunt)
       write(1, info, strlen(info));
     }
   close(f);
-  char log[128], aux[128];
-  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
+  char aux[128];
   snprintf(aux, sizeof(aux), "--list: listed all the treasures from %s\n", hunt);
   int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
   if(lo==-1)
