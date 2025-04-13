@@ -46,7 +46,7 @@ int isValidFloat(char* str) {
     while (str[i] != '\0') {
         if (isdigit(str[i])) {
             hasDigit = 1; 
-        } else if (str[i] == '.' && !hasDot) {
+        } else if (str[i] == '.' && !hasDot && hasDigit) {
             hasDot = 1; 
         } else if (str[i] == '-' && i == 0) {
         } else {
@@ -62,15 +62,15 @@ TREASURE* newTreasure(char *hunt)
   TREASURE* new = (TREASURE*)malloc(sizeof(TREASURE));
   if(new==NULL)
     {
-      perror("Error allocating space for a treasure\n");
+      perror("Error allocating space for a new treasure\n");
       exit(EXIT_FAILURE);
     }
   char buff_in[32], buff_out[256];
   
-  strcpy(buff_out, "ID: ");
+  strcpy(buff_out, "Treasure ID: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(atoi(buff_in)<=0)
+  if(atoi(buff_in)==0)
     {
       perror("Invalid id\n");
       free(new);
@@ -85,6 +85,7 @@ TREASURE* newTreasure(char *hunt)
   if(strlen(buff_in)==0)
     {
       perror("Username is empty\n");
+      free(new);
       exit(EXIT_FAILURE);
     }
   TREASURE t;
@@ -94,13 +95,16 @@ TREASURE* newTreasure(char *hunt)
   if(f==-1)
     {
       perror("Error at opening treasure file\n");
+      free(new);
       exit(EXIT_FAILURE);
     }
   while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
   {
     if(strcmp(buff_in, t.user)==0)
     {
-      perror("This user name is already in the file");
+      perror("This user name is already in the file\n");
+      free(new);
+      close(f);
       exit(EXIT_FAILURE);
     }
   }
@@ -114,6 +118,7 @@ TREASURE* newTreasure(char *hunt)
   if(isValidFloat(buff_in)==0)
   {
     perror("Invalid latitude\n");
+    free(new);
     exit(EXIT_FAILURE);
   }
   new->gps.latitude=atof(buff_in);
@@ -125,6 +130,7 @@ TREASURE* newTreasure(char *hunt)
   if(isValidFloat(buff_in)==0)
   {
     perror("Invalid longitude\n");
+    free(new);
     exit(EXIT_FAILURE);
   }
   new->gps.longitude=atof(buff_in);
@@ -136,6 +142,7 @@ TREASURE* newTreasure(char *hunt)
   if(strlen(buff_in)==0)
     {
       perror("Clue is empty\n");
+      free(new);
       exit(EXIT_FAILURE);
     }
   strcpy(new->clue, buff_in);
@@ -144,7 +151,7 @@ TREASURE* newTreasure(char *hunt)
   strcpy(buff_out, "Value: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(atoi(buff_in)<=0)
+  if(atoi(buff_in)==0)
     {
       perror("Invalid value\n");
       free(new);
@@ -203,6 +210,7 @@ void add(char *hunt)
   if(write(lo, info, strlen(info))==-1)
   {
     perror("Error writing to log file\n");
+    free(new);
     exit(EXIT_FAILURE);
   }
   close(lo);
@@ -435,7 +443,7 @@ void remove_treasure(char *hunt, char *id)
     }
    char log[128], info[128];
    snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
-   snprintf(info, sizeof(info), "--remove_treasure: removed the treasure with the %d id\n", ID);
+   snprintf(info, sizeof(info), "--remove_treasure: removed the treasure with the %d id from the %s hunt\n", ID, hunt);
    int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
    if(lo==-1)
     {
