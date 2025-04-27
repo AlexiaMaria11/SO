@@ -100,9 +100,9 @@ TREASURE* newTreasure(char *hunt)
     }
   while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
   {
-    if(strcmp(buff_in, t.user)==0)
+    if(strcmp(buff_in, t.id)==0)
     {
-      perror("This user name is already in the file\n");
+      perror("This treasure ID is already in the file\n");
       free(new);
       close(f);
       exit(EXIT_FAILURE);
