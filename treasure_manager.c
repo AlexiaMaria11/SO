@@ -71,23 +71,11 @@ TREASURE* newTreasure(char *hunt)
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
   if(atoi(buff_in)==0)
-    {
-      perror("Invalid id\n");
-      free(new);
-      exit(EXIT_FAILURE);
-    }
-  new->id=atoi(buff_in);
-  memset(buff_in, 0, sizeof(buff_in));
-
-  strcpy(buff_out, "Username: ");
-  write(1, buff_out, strlen(buff_out));
-  read_line(buff_in, sizeof(buff_in));
-  if(strlen(buff_in)==0)
-    {
-      perror("Username is empty\n");
-      free(new);
-      exit(EXIT_FAILURE);
-    }
+  {
+    perror("Invalid id\n");
+    free(new);
+    exit(EXIT_FAILURE);
+  }
   TREASURE t;
   char file[128];
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
@@ -100,7 +88,7 @@ TREASURE* newTreasure(char *hunt)
     }
   while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
   {
-    if(strcmp(buff_in, t.id)==0)
+    if(t.id==atoi(buff_in))
     {
       perror("This treasure ID is already in the file\n");
       free(new);
@@ -109,6 +97,18 @@ TREASURE* newTreasure(char *hunt)
     }
   }
   close(f);
+  new->id=atoi(buff_in);
+  memset(buff_in, 0, sizeof(buff_in));
+
+  strcpy(buff_out, "Username: ");
+  write(1, buff_out, strlen(buff_out));
+  read_line(buff_in, sizeof(buff_in));
+  if(strlen(buff_in)==0)
+    {
+      perror("Username is empty\n");
+      free(new);
+      exit(EXIT_FAILURE);
+    }
   strcpy(new->user, buff_in);
   memset(buff_in, 0, sizeof(buff_in));
 

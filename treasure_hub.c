@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <ctype.h>
 #include <time.h>
+#include <signal.h>
 
 typedef struct{
   float latitude, longitude;
@@ -22,34 +23,6 @@ typedef struct{
 }TREASURE;
 
 int running=0, stopping=0, mpid=-1;
-
-void start()
-{
-    if(running)
-    {
-        printf("The monitor is already running\n");
-        return;
-    }
-    int pid=fork();
-    if(pid<0)
-    {
-        perror("Error at creating a child\n");
-        exit(EXIT_FAILURE);
-    }
-    else{
-        if(pid==0)
-        {
-            //nu stiu ce vine aici
-            exit(0);
-        }
-        else{
-            mpid=pid;
-            running=1;
-            stopping=0;
-            printf("Monitor started running\n");
-        }
-    }
-}
 
 int countTreasures(char *hunt)
 {
@@ -95,13 +68,13 @@ void list_hunts()
     int c=0;
     while((d=readdir(dir)))
     {
-        if(strcmp(d->d_name, ".")==0 || strcmp(d->d_name, "..")==0)
+        if(strcmp(d->d_name, ".")==0 || strcmp(d->d_name, "..")==0 || strcmp(d->d_name, ".git")==0)
             continue;
         if(d->d_type == DT_DIR)
         {
             c++;
             int nr=countTreasures(d->d_name);
-            printf("Name: %s\nNumber of treasures: %d\n", d->d_name, nr);
+            printf("Name: %s\tNumber of treasures: %d\n", d->d_name, nr);
         }
     }
     if(c==0)
@@ -109,143 +82,215 @@ void list_hunts()
     closedir(dir);
 }
 
-void list_treasures(char *hunt)
+void handler1(int signal)
 {
-  char file[128], log[128];
-  snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
-  struct stat st,st1, st2;
-  if(lstat(hunt, &st))
-    {
-      perror("Error at finding the path\n");
-      exit(EXIT_FAILURE);
-    }
-  else
-    if(S_ISDIR(st.st_mode)==0)
-      {
-	      perror("It isn't a directory\n");
-	      exit(EXIT_FAILURE);
-      }
-  write(1, "Hunt: ", 6);
-  write(1, hunt, strlen(hunt));
-  if(lstat(file, &st1))
-    {
-      perror("Error at finding the treasure file\n");
-      exit(EXIT_FAILURE);
-    }
-  else
-    if(S_ISREG(st1.st_mode)==0)
-      {
-	      perror("It isn't a regular file\n");
-	      exit(EXIT_FAILURE);
-      }
-  if(lstat(log, &st2))
-    {
-      perror("Error at finding the treasure file\n");
-      exit(EXIT_FAILURE);
-    }
-  else
-    if(S_ISREG(st2.st_mode)==0)
-      {
-	      perror("It isn't a regular file\n");
-	      exit(EXIT_FAILURE);
-      }
-  char size[64];
-  
-  snprintf(size, sizeof(size), "\nTotal size: %ld\n", st1.st_size+st2.st_size);
-  write(1, size, strlen(size));
-  char modification[64];
-  snprintf(modification, sizeof(modification), "Last modification: %s", ctime(&st.st_mtime));
-  write(1, modification, strlen(modification));
-  TREASURE t;
-  int f=open(file, O_RDONLY, 0777);
-  if(f==-1)
-    {
-      perror("Error at opening a treasure file\n");
-      exit(EXIT_FAILURE);
-    }
-  int b;
-  while((b=read(f, &t, sizeof(TREASURE)))==sizeof(TREASURE))
-    {
-      char info[256];
-      snprintf(info, sizeof(info), "ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
-      write(1, info, strlen(info));
-    }
-  close(f);
   char aux[128];
-  snprintf(aux, sizeof(aux), "--list: listed all the treasures from %s\n", hunt);
-  int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-  if(lo==-1)
+  int f=open("command.txt", O_RDONLY);
+  if(f==-1)
+  {
+    perror("Error at opening the command file\n");
+    exit(EXIT_FAILURE);
+  }
+  int b=read(f, aux, sizeof(aux));
+  if(b==-1)
+  {
+    perror("Error at reading\n");
+    exit(EXIT_FAILURE);
+  }
+  else if(b==0)
+  {
+    perror("End of file\n");
+    return;
+  }
+  aux[b]='\0';
+  close(f);
+  char *p=strtok(aux, " \n");
+  if(p==NULL)
+    return;
+  if(strcmp(p, "list_hunts")==0)
+    list_hunts();
+  else
+  {
+    if(strncmp(p, "list_treasures", 14)==0)
     {
-      perror("Error at opening log file\n");
-      exit(EXIT_FAILURE);
+      char *hunt=strtok(NULL, "\n");
+      if(hunt) {
+        int pid=fork();
+        if(pid<0)
+        {
+          perror("Error at creating a child\n");
+          exit(EXIT_FAILURE);
+        }
+        else if(pid==0)
+        {
+          execl("./treasure_manager", "treasure_manager", "--list", hunt, NULL);
+          perror("Error at execl\n");
+          exit(EXIT_FAILURE);
+        }
+      }
+      else printf("You need to introduce an hunt\n");
     }
-  write(lo, aux, strlen(aux));
-  close(lo);
+    else
+    {
+      if(strncmp(p, "view_treasure", 13)==0)
+      {
+        char *hunt=strtok(NULL, " ");
+        char *ID=strtok(NULL, "\n");
+        if(hunt && ID) {
+          int pid=fork();
+          if(pid<0)
+          {
+            perror("Error at creating a child\n");
+            exit(EXIT_FAILURE);
+          }
+          else if(pid==0)
+          {
+            execl("./treasure_manager", "treasure_manager", "--view", hunt, ID, NULL);
+            perror("Error at execl\n");
+            exit(EXIT_FAILURE);
+          }
+        }
+        else printf("You need to introduce an hunt and a treasure id\n");
+      }
+    }
+  }
 }
 
-void view_treasure(char *hunt, char *id)
+void handler2(int signal)
 {
-    if(atoi(id)==0)
-    {
-        perror("Not a valid id\n");
-        exit(EXIT_FAILURE);
-    }
-    int ID=atoi(id);
-    char file[128];
-    struct stat st;
-    if(lstat(hunt, &st))
-    { 
-        perror("Error at finding the path\n");
-        exit(EXIT_FAILURE);
-    }
-    else 
-    {
-        if(S_ISDIR(st.st_mode)==0)
-        {
-        perror("Not a directory\n");
-        exit(EXIT_FAILURE);
-        }
-    }
-    int found_id=0;
-    snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-    int f=open(file, O_RDONLY, 0777);
-    if(f==-1)
-    {
-        perror("Couldn't open the file\n");
-        exit(EXIT_FAILURE);
-    }
-    TREASURE t;
-    while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE) && !found_id)
-    {
-        if(t.id==ID)
-        {
-          found_id=1;
-          char info[256];
-          snprintf(info, sizeof(info), "ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
-          write(1, info, strlen(info));
-        }
-    }
-    close(f);
-    if(found_id==0)
-    {
-        write(1, "ID not found\n", 14);
-    }
-    char log[128], aux[128];
-    snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
-    snprintf(aux, sizeof(aux), "--view: viewed the treasure with the %d id\n", ID);
-    int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-    if(lo==-1)
-    {
-        perror("Error at opening log file\n");
-        exit(EXIT_FAILURE);
-    }
-    write(lo, aux, strlen(aux));
-    close(lo);
+  printf("Monitor is stopping\n");
+  usleep(10000000);
+  exit(0);
 }
 
-int main(int argc, char *argv[])
+void handler3(int signal)
 {
+  int status, pid;
+  while((pid=waitpid(-1, &status, 0))!=-1)   //-1 pentru orice copil inclusiv din treasure_manager
+  {
+    if(pid==mpid)
+    {
+      printf("Monitor ended with code: %d\n", WEXITSTATUS(status));
+      running=0;
+      mpid=-1;
+      stopping=0;
+    }
+    else printf("Child process from treasure_manager\n");
+  }
+}
 
-    return 0;
+void start_monitor()
+{
+    if(running)
+    {
+        printf("The monitor is already running\n");
+        return;
+    }
+    int pid=fork();
+    if(pid<0)
+    {
+        perror("Error at creating a child\n");
+        exit(EXIT_FAILURE);
+    }
+    else{
+        if(pid==0)
+        {
+            struct sigaction sa1, sa2;
+            sa1.sa_handler=handler1;
+            sa1.sa_flags=0;
+            sigaction(SIGUSR1, &sa1, NULL);
+            sa2.sa_handler=handler2;
+            sa2.sa_flags=0;
+            sigaction(SIGUSR2, &sa2, NULL);
+            while(1) pause();
+            exit(0);
+        }
+        else{
+            mpid=pid;
+            running=1;
+            stopping=0;
+            printf("Monitor started running\n");
+        }
+    }
+}
+
+void command(char *command_name)
+{
+  int f=open("command.txt", O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  if(f==-1)
+  {
+    perror("Error at opening the command file\n");
+    exit(EXIT_FAILURE);
+  }
+  write(f, command_name, strlen(command_name));
+  kill(mpid, SIGUSR1);
+  sleep(5);
+  close(f);
+}
+
+int main(void)
+{
+  struct sigaction s;
+  s.sa_handler=handler3;
+  s.sa_flags=0;
+  sigaction(SIGCHLD, &s, NULL);
+  char input[128];
+  while(1)
+  {
+    if(fgets(input, sizeof(input), stdin)==NULL)
+      continue;
+    input[strcspn(input,"\n")]='\0';
+    if(strcmp(input, "start_monitor")==0)
+      start_monitor();
+    else
+    {
+      if(strcmp(input, "list_hunts")==0)
+      {
+        if(running==0) printf("You need to start the monitor first\n");
+        else if(stopping==1) printf("Monitor is stopping and you can't give any commands\n");
+        else command(input);
+      }
+      else
+      {
+        if(strncmp(input, "list_treasures", 14)==0)
+        {
+          if(running==0) printf("You need to start the monitor first\n");
+          else if(stopping==1) printf("Monitor is stopping and you can't give any commands\n");
+          else command(input);
+        }
+        else
+        {
+          if(strncmp(input, "view_treasure", 13)==0)
+          {
+            if(running==0) printf("You need to start the monitor first\n");
+            else if(stopping==1) printf("Monitor is stopping and you can't give any commands\n");
+            else command(input);
+          }
+          else
+          {
+            if(strcmp(input, "stop_monitor")==0)
+            {
+              if(running==0) printf("The monitor is not running\n");
+              else
+              {
+                kill(mpid, SIGUSR2);
+                sleep(1);
+                stopping=1;
+              }
+            }
+            else
+            {
+              if(strcmp(input, "exit")==0)
+              {
+                if(running) printf("Monitor is running\n");
+                else break;
+              }
+              else printf("The command is not correct\n");
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0;
 }
