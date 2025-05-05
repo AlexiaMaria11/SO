@@ -6,10 +6,10 @@ Exemple de rulare:
 ./treasure_manager --remove_treasure Hunt1 1 (id_treasure)  
 ./treasure_manager --remove_hunt Hunt1
 
-Phase 2
-start_monitor
-list_hunts
-list_treasures Hunt1
-view_treasure Hunt1 2
-stop_monitor
+Phase 2  
+start_monitor  
+list_hunts  
+list_treasures Hunt1  
+view_treasure Hunt1 2  
+stop_monitor  
 exit
