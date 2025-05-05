@@ -26,34 +26,47 @@ int running=0, stopping=0, mpid=-1;
 
 int countTreasures(char *hunt)
 {
-    char file[128];
-    snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-    struct stat st;
-    if(lstat(hunt, &st))
+  char file[128];
+  snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
+  struct stat st;
+  if(lstat(hunt, &st))
+  {
+    perror("Error at finding the path\n");
+    exit(EXIT_FAILURE);
+  }
+  else
+  if(S_ISDIR(st.st_mode)==0)
     {
-      perror("Error at finding the path\n");
+	    perror("It isn't a directory\n");
+	    exit(EXIT_FAILURE);
+    }
+  int f=open(file, O_RDONLY);
+  if(f==-1)
+  {
+    perror("Couldn't open the treasures file\n");
+    exit(EXIT_FAILURE);
+  }
+  int b, c=0;
+  TREASURE t;
+  while((b=read(f, &t, sizeof(TREASURE)))==sizeof(TREASURE))
+  {
+    c++;
+  }
+  if (b == -1) 
+  {
+    perror("Error reading the treasures file\n");
+    if(close(f)==-1)
+    {
+      perror("Error closing the file");
       exit(EXIT_FAILURE);
     }
-    else
-    if(S_ISDIR(st.st_mode)==0)
-      {
-	      perror("It isn't a directory\n");
-	      exit(EXIT_FAILURE);
-      }
-    int f=open(file, O_RDONLY);
-    if(f==-1)
-    {
-        perror("Couldn't open the treasures file\n");
-        exit(EXIT_FAILURE);
-    }
-    int b, c=0;
-    TREASURE t;
-    while((b=read(f, &t, sizeof(TREASURE)))==sizeof(TREASURE))
-    {
-      c++;
-    }
-    close(f);
-    return c;
+  }
+  if(close(f)==-1)
+  {
+    perror("Error closing the file");
+    exit(EXIT_FAILURE);
+  }
+  return c;
 }
 
 void list_hunts()
@@ -95,15 +108,29 @@ void handler1(int signal)
   if(b==-1)
   {
     perror("Error at reading\n");
+    if(close(f)==-1)
+    {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+    }
     exit(EXIT_FAILURE);
   }
   else if(b==0)
   {
     perror("End of file\n");
+    if(close(f)==-1)
+    {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+    }
     return;
   }
   aux[b]='\0';
-  close(f);
+  if(close(f)==-1)
+  {
+    perror("Error closing the file");
+    exit(EXIT_FAILURE);
+  }
   char *p=strtok(aux, " \n");
   if(p==NULL)
     return;

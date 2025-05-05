@@ -20,41 +20,20 @@ typedef struct{
   int value;
 }TREASURE;
 
-int read_line(char *text, int size)
+int read_line(char *text, int size) 
 {
-  int len=read(0, text, size-1);
-  if(len>0)
-    {
-      if(text[len-1]=='\n')
-	    {   
-	      text[len-1]='\0';
-	      len--;
-	    }
-      else
-	      text[len]='\0';
-    }
-  else
-    text[0]='\0';
+  if (fgets(text, size, stdin) == NULL) 
+  {
+    text[0] = '\0';
+    return 0;
+  }
+  int len = strlen(text);
+  if (len > 0 && text[len - 1] == '\n') 
+  {
+    text[len - 1] = '\0';
+    len--;
+  }
   return len;
-}
-
-int isValidFloat(char* str) {
-    int i = 0;
-    int hasDot = 0;
-    int hasDigit = 0;
-
-    while (str[i] != '\0') {
-        if (isdigit(str[i])) {
-            hasDigit = 1; 
-        } else if (str[i] == '.' && !hasDot && hasDigit) {
-            hasDot = 1; 
-        } else if (str[i] == '-' && i == 0) {
-        } else {
-            return 0; 
-        }
-        i++;
-    }
-    return hasDigit && (hasDot || i > 0);
 }
 
 TREASURE* newTreasure(char *hunt)
@@ -70,12 +49,14 @@ TREASURE* newTreasure(char *hunt)
   strcpy(buff_out, "Treasure ID: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(atoi(buff_in)==0)
-  {
-    perror("Invalid id\n");
+  char *endptr;
+  long val = strtol(buff_in, &endptr, 10);
+  if (*endptr != '\0') {
+    perror("Invalid treasure ID\n");
     free(new);
     exit(EXIT_FAILURE);
   }
+
   TREASURE t;
   char file[128];
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
@@ -88,16 +69,24 @@ TREASURE* newTreasure(char *hunt)
     }
   while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
   {
-    if(t.id==atoi(buff_in))
+    if(t.id==val)
     {
       perror("This treasure ID is already in the file\n");
       free(new);
-      close(f);
+      if(close(f)==-1)
+      {
+        perror("Error closing the file");
+        exit(EXIT_FAILURE);
+      }
       exit(EXIT_FAILURE);
     }
   }
-  close(f);
-  new->id=atoi(buff_in);
+  if(close(f)==-1)
+  {
+    perror("Error closing the file");
+    exit(EXIT_FAILURE);
+  }
+  new->id=val;
   memset(buff_in, 0, sizeof(buff_in));
 
   strcpy(buff_out, "Username: ");
@@ -115,25 +104,37 @@ TREASURE* newTreasure(char *hunt)
   strcpy(buff_out, "Latitude: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(isValidFloat(buff_in)==0)
-  {
+  float valf = strtof(buff_in, &endptr);
+  if (*endptr != '\0') {
     perror("Invalid latitude\n");
     free(new);
     exit(EXIT_FAILURE);
   }
-  new->gps.latitude=atof(buff_in);
+  new->gps.latitude=valf;
+  if (new->gps.latitude < -90.0 || new->gps.latitude > 90.0) 
+  {
+    perror("Latitude must be between -90 and 90\n");
+    free(new);
+    exit(EXIT_FAILURE);
+  }
   memset(buff_in, 0, sizeof(buff_in));
 
   strcpy(buff_out, "Longitude: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(isValidFloat(buff_in)==0)
-  {
+  valf = strtof(buff_in, &endptr);
+  if (*endptr != '\0') {
     perror("Invalid longitude\n");
     free(new);
     exit(EXIT_FAILURE);
   }
-  new->gps.longitude=atof(buff_in);
+  new->gps.longitude=valf;
+  if (new->gps.longitude < -180.0 || new->gps.longitude > 180.0) 
+  {
+    perror("Longitude must be between -180 and 180\n");
+    free(new);
+    exit(EXIT_FAILURE);
+  }
   memset(buff_in, 0, sizeof(buff_in));
 
   strcpy(buff_out, "Clue: ");
@@ -151,13 +152,13 @@ TREASURE* newTreasure(char *hunt)
   strcpy(buff_out, "Value: ");
   write(1, buff_out, strlen(buff_out));
   read_line(buff_in, sizeof(buff_in));
-  if(atoi(buff_in)==0)
-    {
-      perror("Invalid value\n");
-      free(new);
-      exit(EXIT_FAILURE);
-    }
-  new->value=atoi(buff_in);
+  val = strtol(buff_in, &endptr, 10);
+  if (*endptr != '\0') {
+    perror("Invalid value\n");
+    free(new);
+    exit(EXIT_FAILURE);
+  }
+  new->value=val;
   memset(buff_in, 0, sizeof(buff_in));
 
   return new;
@@ -193,15 +194,22 @@ void add(char *hunt)
   if(write(f, new, sizeof(*new))==-1)
     {
       perror("Error at writing a new feature");
-      close(f);
+      if(close(f)==-1)
+      {
+        perror("Error closing the file");
+        exit(EXIT_FAILURE);
+      }
       exit(EXIT_FAILURE);
     }
-  close(f);
+  if(close(f)==-1)
+  {
+    perror("Error closing the file");
+    exit(EXIT_FAILURE);
+  }
   int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
   if(lo==-1)
     {
       perror("Error at opening log file\n");
-      close(f);
       free(new);
       exit(EXIT_FAILURE);
     }
@@ -211,9 +219,18 @@ void add(char *hunt)
   {
     perror("Error writing to log file\n");
     free(new);
+    if(close(lo)==-1)
+    {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+    }
     exit(EXIT_FAILURE);
   }
-  close(lo);
+  if(close(lo)==-1)
+  {
+    perror("Error closing the file");
+    exit(EXIT_FAILURE);
+  }
   free(new);
   if(lstat(link, &st)==-1)
     {
@@ -230,7 +247,7 @@ void add(char *hunt)
 	      write(1, "Symbolic link already exists\n", strlen("Symbolic link already exists\n"));
 	    }
     }
-  write(1, "Treasure added\n", 16);
+  printf("Treasure added\n");
 }
 
 void list(char *hunt)
@@ -295,7 +312,11 @@ void list(char *hunt)
       snprintf(info, sizeof(info), "ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
       write(1, info, strlen(info));
     }
-  close(f);
+  if(close(f)==-1)
+  {
+    perror("Error closing the file");
+    exit(EXIT_FAILURE);
+  }
   char aux[128];
   snprintf(aux, sizeof(aux), "--list: listed all the treasures from %s\n", hunt);
   int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
@@ -305,7 +326,12 @@ void list(char *hunt)
       exit(EXIT_FAILURE);
     }
   write(lo, aux, strlen(aux));
-  close(lo);
+  printf("%s listed\n", hunt);
+  if(close(lo)==-1)
+  {
+    perror("Error closing the file");
+    exit(EXIT_FAILURE);
+  }
 }
 
 void view(char *hunt, char *id)
@@ -350,10 +376,15 @@ void view(char *hunt, char *id)
           write(1, info, strlen(info));
         }
     }
-    close(f);
+    if(close(f)==-1)
+    {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+    }
     if(found_id==0)
     {
-        write(1, "ID not found\n", 14);
+        write(1, "The treasure with this id was not found\n", 40);
+        return;
     }
     char log[128], aux[128];
     snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
@@ -365,7 +396,12 @@ void view(char *hunt, char *id)
         exit(EXIT_FAILURE);
     }
     write(lo, aux, strlen(aux));
-    close(lo);
+    printf("Viewed the treasure with the id=%d in the %s\n", ID, hunt);
+    if(close(lo)==-1)
+    {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+    }
 }
 
 void remove_treasure(char *hunt, char *id)
@@ -416,8 +452,16 @@ void remove_treasure(char *hunt, char *id)
         }
         write(a, &t, sizeof(TREASURE));
     }
-    close(f);
-    close(a);
+    if(close(f)==-1)
+    {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+    }
+    if(close(a)==-1)
+    {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+    }
     if(found_id)
     {
       if(unlink(file))
@@ -451,8 +495,12 @@ void remove_treasure(char *hunt, char *id)
         exit(EXIT_FAILURE);
     }
    write(lo, info, strlen(info));
-   close(lo);
-   write(1, "Treasure removed\n", 18);
+   printf("Removed the treasure with the id=%d from the %s\n", ID, hunt);
+   if(close(lo)==-1)
+   {
+      perror("Error closing the file");
+      exit(EXIT_FAILURE);
+   }
 }
 
 void remove_hunt(char *hunt)
@@ -522,7 +570,7 @@ void remove_hunt(char *hunt)
     perror("Error at deleting the directory\n");
     exit(EXIT_FAILURE);
   }
-  write(1, "Hunt removed\n", 13);
+  printf("%s removed\n", hunt);
 }
 
 int main(int argc, char *argv[])
