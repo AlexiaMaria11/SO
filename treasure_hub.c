@@ -24,6 +24,7 @@ typedef struct{
 
 int running=0, stopping=0, mpid=-1;
 
+//counts the treasures from the specified hunt
 int countTreasures(char *hunt)
 {
   char file[128];
@@ -69,6 +70,7 @@ int countTreasures(char *hunt)
   return c;
 }
 
+//list all the hunts and shows the treasures count in each
 void list_hunts()
 {
     DIR *dir=opendir(".");
@@ -95,6 +97,7 @@ void list_hunts()
     closedir(dir);
 }
 
+//handler for SIGUSR1 (different actions based on the input from the terminal)
 void handler1(int signal)
 {
   char aux[128];
@@ -183,6 +186,7 @@ void handler1(int signal)
   }
 }
 
+//handler for SIGUSR2 (stopping the monitor)
 void handler2(int signal)
 {
   printf("Monitor is stopping\n");
@@ -190,10 +194,11 @@ void handler2(int signal)
   exit(0);
 }
 
+//handler for SICHLD (detects if the monitor ended)
 void handler3(int signal)
 {
   int status, pid;
-  while((pid=waitpid(-1, &status, 0))!=-1)   //-1 pentru orice copil inclusiv din treasure_manager
+  while((pid=waitpid(-1, &status, 0))!=-1)   //-1 for any child (from treasure_manager)
   {
     if(pid==mpid)
     {
@@ -202,10 +207,19 @@ void handler3(int signal)
       mpid=-1;
       stopping=0;
     }
-    else printf("Child process from treasure_manager\n");
+    else 
+    {
+      if(WEXITSTATUS(status))
+      {
+        int code=WEXITSTATUS(status);
+        if(code) printf("treasure_manager ended with with code: %d\n", code);
+        else printf("treasure_manager ended succesfully\n");
+      }
+    }
   }
 }
 
+//starts the monitor and handles the commands with signals
 void start_monitor()
 {
     if(running)
@@ -241,6 +255,7 @@ void start_monitor()
     }
 }
 
+//write a command to an auxiliar file "commnad.txt"
 void command(char *command_name)
 {
   int f=open("command.txt", O_WRONLY | O_CREAT | O_TRUNC, 0777);

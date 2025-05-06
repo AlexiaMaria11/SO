@@ -20,6 +20,8 @@ typedef struct{
   int value;
 }TREASURE;
 
+//removes the \n character if it exists
+//retunrs the length of the string
 int read_line(char *text, int size) 
 {
   if (fgets(text, size, stdin) == NULL) 
@@ -36,6 +38,7 @@ int read_line(char *text, int size)
   return len;
 }
 
+//creates a new treasure and validates the input
 TREASURE* newTreasure(char *hunt)
 {
   TREASURE* new = (TREASURE*)malloc(sizeof(TREASURE));
@@ -57,6 +60,7 @@ TREASURE* newTreasure(char *hunt)
     exit(EXIT_FAILURE);
   }
 
+  //unique ID check
   TREASURE t;
   char file[128];
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
@@ -75,7 +79,7 @@ TREASURE* newTreasure(char *hunt)
       free(new);
       if(close(f)==-1)
       {
-        perror("Error closing the file");
+        perror("Error closing the file\n");
         exit(EXIT_FAILURE);
       }
       exit(EXIT_FAILURE);
@@ -83,7 +87,7 @@ TREASURE* newTreasure(char *hunt)
   }
   if(close(f)==-1)
   {
-    perror("Error closing the file");
+    perror("Error closing the file\n");
     exit(EXIT_FAILURE);
   }
   new->id=val;
@@ -164,6 +168,10 @@ TREASURE* newTreasure(char *hunt)
   return new;
 }
 
+//adds a new treasure to the hunt
+//creates the directory if it does not exist
+//logs the operation in logged_hunt
+//creates the symbolic link if it does not exist
 void add(char *hunt)
 {
   char dir[128], file[128], log[128], link[128];
@@ -193,17 +201,17 @@ void add(char *hunt)
   TREASURE *new = newTreasure(hunt);
   if(write(f, new, sizeof(*new))==-1)
     {
-      perror("Error at writing a new feature");
+      perror("Error at writing a new feature\n");
       if(close(f)==-1)
       {
-        perror("Error closing the file");
+        perror("Error closing the file\n");
         exit(EXIT_FAILURE);
       }
       exit(EXIT_FAILURE);
     }
   if(close(f)==-1)
   {
-    perror("Error closing the file");
+    perror("Error closing the file\n");
     exit(EXIT_FAILURE);
   }
   int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
@@ -221,35 +229,37 @@ void add(char *hunt)
     free(new);
     if(close(lo)==-1)
     {
-      perror("Error closing the file");
+      perror("Error closing the file\n");
       exit(EXIT_FAILURE);
     }
     exit(EXIT_FAILURE);
   }
   if(close(lo)==-1)
   {
-    perror("Error closing the file");
+    perror("Error closing the file\n");
     exit(EXIT_FAILURE);
   }
   free(new);
   if(lstat(link, &st)==-1)
-    {
-      if(symlink(log, link)==-1)
-	    {
-	      perror("Couldn't create a symlink\n");
-	      exit(EXIT_FAILURE);
-	    }
-    }
+  {
+    if(symlink(log, link)==-1)
+	  {
+	    perror("Couldn't create a symlink\n");
+	    exit(EXIT_FAILURE);
+	  }
+  }
   else
-    {
-      if(S_ISLNK(st.st_mode))
-	    {
-	      write(1, "Symbolic link already exists\n", strlen("Symbolic link already exists\n"));
-	    }
-    }
+  {
+    if(S_ISLNK(st.st_mode))
+	  {
+	    write(1, "Symbolic link already exists\n", strlen("Symbolic link already exists\n"));
+	  }
+  }
   printf("Treasure added\n");
 }
 
+//lists all the treasures from the hunt, the total size of the hunt and the last modification
+//logs the operation in logged_hunt
 void list(char *hunt)
 {
   char file[128], log[128];
@@ -314,7 +324,7 @@ void list(char *hunt)
     }
   if(close(f)==-1)
   {
-    perror("Error closing the file");
+    perror("Error closing the file\n");
     exit(EXIT_FAILURE);
   }
   char aux[128];
@@ -329,11 +339,13 @@ void list(char *hunt)
   printf("%s listed\n", hunt);
   if(close(lo)==-1)
   {
-    perror("Error closing the file");
+    perror("Error closing the file\n");
     exit(EXIT_FAILURE);
   }
 }
 
+//view the treasure with the specified id from the hunt
+//logs the operation in logged_hunt
 void view(char *hunt, char *id)
 {
     if(atoi(id)==0)
@@ -384,7 +396,7 @@ void view(char *hunt, char *id)
     if(found_id==0)
     {
         write(1, "The treasure with this id was not found\n", 40);
-        return;
+        exit(EXIT_FAILURE);
     }
     char log[128], aux[128];
     snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
@@ -399,11 +411,13 @@ void view(char *hunt, char *id)
     printf("Viewed the treasure with the id=%d in the %s\n", ID, hunt);
     if(close(lo)==-1)
     {
-      perror("Error closing the file");
+      perror("Error closing the file\n");
       exit(EXIT_FAILURE);
     }
 }
 
+//removes the treasure with the specified id from the hunt(rewrites the treasures.dat file)
+//logs the operation in logged_hunt
 void remove_treasure(char *hunt, char *id)
 {
     if(atoi(id)==0)
@@ -454,12 +468,12 @@ void remove_treasure(char *hunt, char *id)
     }
     if(close(f)==-1)
     {
-      perror("Error closing the file");
+      perror("Error closing the file\n");
       exit(EXIT_FAILURE);
     }
     if(close(a)==-1)
     {
-      perror("Error closing the file");
+      perror("Error closing the file\n");
       exit(EXIT_FAILURE);
     }
     if(found_id)
@@ -498,11 +512,12 @@ void remove_treasure(char *hunt, char *id)
    printf("Removed the treasure with the id=%d from the %s\n", ID, hunt);
    if(close(lo)==-1)
    {
-      perror("Error closing the file");
+      perror("Error closing the file\n");
       exit(EXIT_FAILURE);
    }
 }
 
+//remove the hunt and all the files
 void remove_hunt(char *hunt)
 {
   char file[128], log[128], link[128];
