@@ -70,7 +70,7 @@ int countTreasures(char *hunt)
   return c;
 }
 
-//list all the hunts and shows the treasures count in each
+//list all the hunts and shows the treasures count in each hunt
 void list_hunts()
 {
     DIR *dir=opendir(".");

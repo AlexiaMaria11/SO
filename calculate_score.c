@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
                 users=realloc(users, size*sizeof(USER_SCORE));
                 if(users==NULL)
                 {
-                    perror("Error at realloc\n");
+                    perror("Error at users realloc\n");
                     exit(EXIT_FAILURE);
                     if(close(f)==-1)
                     {
