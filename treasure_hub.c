@@ -182,6 +182,29 @@ void handler1(int signal)
         }
         else printf("You need to introduce an hunt and a treasure id\n");
       }
+      else
+      {
+        if(strncmp(p, "calculate_score", 15)==0)
+        {
+          char *hunt=strtok(NULL, " ");
+          if(hunt) 
+          {
+            int pid=fork();
+            if(pid<0)
+            {
+              perror("Error at creating a child\n");
+              exit(EXIT_FAILURE);
+            }
+            else if(pid==0)
+            {
+              execl("./calculate_score", "calculate_score", hunt, NULL);
+              perror("Error at execl\n");
+              exit(EXIT_FAILURE);
+            }
+          }
+          else printf("You need to introduce an hunt\n");
+        }
+      }
     }
   }
 }
@@ -198,26 +221,29 @@ void handler2(int signal)
 void handler3(int signal)
 {
   int status, pid;
-  while((pid=waitpid(-1, &status, 0))!=-1)   //-1 for any child (from treasure_manager)
+  while((pid = waitpid(-1, &status, 0)) != -1)   //-1 for any child
   {
-    if(pid==mpid)
+    if (WIFEXITED(status)) 
     {
-      printf("Monitor ended with code: %d\n", WEXITSTATUS(status));
-      running=0;
-      mpid=-1;
-      stopping=0;
-    }
-    else 
-    {
-      if(WEXITSTATUS(status))
+      int code = WEXITSTATUS(status);
+      if (pid == mpid) 
       {
-        int code=WEXITSTATUS(status);
-        if(code) printf("treasure_manager ended with with code: %d\n", code);
-        else printf("treasure_manager ended succesfully\n");
+        printf("Monitor ended with code: %d\n", code);
+        running = 0;
+        mpid = -1;
+        stopping = 0;
+      }
+      else 
+      {
+        if (code == 0)
+          printf("treasure_manager or calculate_score ended successfully\n");
+        else
+          printf("treasure_manager or calculate_score ended with error code: %d\n", code);
       }
     }
   }
 }
+
 
 //starts the monitor and handles the commands with signals
 void start_monitor()
@@ -327,7 +353,17 @@ int main(void)
                 if(running) printf("Monitor is running\n");
                 else break;
               }
-              else printf("The command is not correct\n");
+              else 
+              {
+                if(strncmp(input, "calculate_score", 15)==0)
+                {
+                  if(running==0) printf("You need to start the monitor first\n");
+                  else if(stopping==1) printf("Monitor is stopping and you can't give any commands\n");
+                  else command(input);
+                }
+                else
+                  printf("The command is not correct\n");
+              }
             }
           }
         }
