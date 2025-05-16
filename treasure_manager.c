@@ -20,6 +20,45 @@ typedef struct{
   int value;
 }TREASURE;
 
+int safe_open(char *path, int flags, mode_t mode) 
+{
+  int fd = open(path, flags, mode);
+  if (fd == -1) 
+  {
+    perror(path);
+    exit(EXIT_FAILURE);
+  }
+  return fd;
+}
+
+void safe_close(int fd) 
+{
+  if (close(fd) == -1) 
+  {
+    perror("Close");
+    exit(EXIT_FAILURE);
+  }
+}
+
+void ensure_type(char *path, mode_t type) 
+{
+  struct stat st;
+  if (lstat(path, &st) == -1) 
+  {
+    perror(path);
+    exit(EXIT_FAILURE);
+  }
+  if ((st.st_mode & S_IFMT) != type)
+  {
+    fprintf(stderr, "%s is not a valid %s\n", path,
+        (type == S_IFDIR) ? "directory" :
+        (type == S_IFREG) ? "regular file" :
+        (type == S_IFLNK) ? "symbolic link" : "type");
+    exit(EXIT_FAILURE);
+  }
+}
+
+
 //removes the \n character if it exists
 //retunrs the length of the string
 int read_line(char *text, int size) 
@@ -43,19 +82,19 @@ TREASURE* newTreasure(char *hunt)
 {
   TREASURE* new = (TREASURE*)malloc(sizeof(TREASURE));
   if(new==NULL)
-    {
-      perror("Error allocating space for a new treasure\n");
-      exit(EXIT_FAILURE);
-    }
-  char buff_in[32], buff_out[256];
+  {
+    perror("Error allocating space for a new treasure");
+    exit(EXIT_FAILURE);
+  }
+  char buff_in[64];
   
-  strcpy(buff_out, "Treasure ID: ");
-  write(1, buff_out, strlen(buff_out));
+  printf("Treasure ID: ");
   read_line(buff_in, sizeof(buff_in));
   char *endptr;
   long val = strtol(buff_in, &endptr, 10);
-  if (*endptr != '\0') {
-    perror("Invalid treasure ID\n");
+  if (*endptr != '\0') 
+  {
+    fprintf(stderr, "Invalid treasure ID\n");
     free(new);
     exit(EXIT_FAILURE);
   }
@@ -64,101 +103,84 @@ TREASURE* newTreasure(char *hunt)
   TREASURE t;
   char file[128];
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-  int f=open(file, O_RDONLY, 0777);
-  if(f==-1)
-    {
-      perror("Error at opening treasure file\n");
-      free(new);
-      exit(EXIT_FAILURE);
-    }
+  int f=safe_open(file, O_RDONLY, 0777);
   while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
   {
     if(t.id==val)
     {
-      perror("This treasure ID is already in the file\n");
+      fprintf(stderr, "This treasure ID is already in the file\n");
       free(new);
-      if(close(f)==-1)
-      {
-        perror("Error closing the file\n");
-        exit(EXIT_FAILURE);
-      }
+      safe_close(f);
       exit(EXIT_FAILURE);
     }
   }
-  if(close(f)==-1)
-  {
-    perror("Error closing the file\n");
-    exit(EXIT_FAILURE);
-  }
+  close(f);
   new->id=val;
   memset(buff_in, 0, sizeof(buff_in));
 
-  strcpy(buff_out, "Username: ");
-  write(1, buff_out, strlen(buff_out));
+  printf("Username: ");
   read_line(buff_in, sizeof(buff_in));
   if(strlen(buff_in)==0)
-    {
-      perror("Username is empty\n");
-      free(new);
-      exit(EXIT_FAILURE);
-    }
+  {
+    fprintf(stderr, "Username is empty\n");
+    free(new);
+    exit(EXIT_FAILURE);
+  }
   strcpy(new->user, buff_in);
   memset(buff_in, 0, sizeof(buff_in));
 
-  strcpy(buff_out, "Latitude: ");
-  write(1, buff_out, strlen(buff_out));
+  printf("Latitude: ");
   read_line(buff_in, sizeof(buff_in));
   float valf = strtof(buff_in, &endptr);
-  if (*endptr != '\0') {
-    perror("Invalid latitude\n");
+  if (*endptr != '\0') 
+  {
+    fprintf(stderr, "Invalid latitude\n");
     free(new);
     exit(EXIT_FAILURE);
   }
   new->gps.latitude=valf;
   if (new->gps.latitude < -90.0 || new->gps.latitude > 90.0) 
   {
-    perror("Latitude must be between -90 and 90\n");
+    fprintf(stderr, "Latitude must be between -90 and 90\n");
     free(new);
     exit(EXIT_FAILURE);
   }
   memset(buff_in, 0, sizeof(buff_in));
 
-  strcpy(buff_out, "Longitude: ");
-  write(1, buff_out, strlen(buff_out));
+  printf("Longitude: ");
   read_line(buff_in, sizeof(buff_in));
   valf = strtof(buff_in, &endptr);
-  if (*endptr != '\0') {
-    perror("Invalid longitude\n");
+  if (*endptr != '\0') 
+  {
+    fprintf(stderr, "Invalid longitude\n");
     free(new);
     exit(EXIT_FAILURE);
   }
   new->gps.longitude=valf;
   if (new->gps.longitude < -180.0 || new->gps.longitude > 180.0) 
   {
-    perror("Longitude must be between -180 and 180\n");
+    fprintf(stderr, "Longitude must be between -180 and 180\n");
     free(new);
     exit(EXIT_FAILURE);
   }
   memset(buff_in, 0, sizeof(buff_in));
 
-  strcpy(buff_out, "Clue: ");
-  write(1, buff_out, strlen(buff_out));
+  printf("Clue: ");
   read_line(buff_in, sizeof(buff_in));
   if(strlen(buff_in)==0)
-    {
-      perror("Clue is empty\n");
-      free(new);
-      exit(EXIT_FAILURE);
-    }
+  {
+    fprintf(stderr, "Clue is empty\n");
+    free(new);
+    exit(EXIT_FAILURE);
+  }
   strcpy(new->clue, buff_in);
   memset(buff_in, 0, sizeof(buff_in));
 
-  strcpy(buff_out, "Value: ");
-  write(1, buff_out, strlen(buff_out));
+  printf("Value: ");
   read_line(buff_in, sizeof(buff_in));
   val = strtol(buff_in, &endptr, 10);
   if (*endptr != '\0') {
-    perror("Invalid value\n");
+    fprintf(stderr, "Invalid value\n");
     free(new);
     exit(EXIT_FAILURE);
   }
@@ -178,73 +200,47 @@ void add(char *hunt)
   snprintf(dir, sizeof(dir), "%s", hunt);
   struct stat st;
   if(lstat(dir, &st)==0 && S_ISDIR(st.st_mode))
-    {
-      write(1, "Directory already exists\n", strlen("Directory already exists\n"));
-    }
+  {
+    printf("Directory already exists\n");
+  }
   else
+  {
+    if(mkdir(dir, 0777)==-1)
     {
-      if(mkdir(dir, 0777)==-1)
-	    {
-	      perror("Couldn't create a new directory\n");
-	      exit(EXIT_FAILURE);
-	    }
+      perror("Couldn't create a new directory");
+      exit(EXIT_FAILURE);
     }
+  }
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
   snprintf(link, sizeof(link), "logged_hunt-%s", hunt);
-  int f=open(file, O_WRONLY | O_CREAT | O_APPEND, 0777);
-  if(f==-1)
-    {
-      perror("Error at opening treasure file\n");
-      exit(EXIT_FAILURE);
-    }
+  int f=safe_open(file, O_WRONLY | O_CREAT | O_APPEND, 0777);
   TREASURE *new = newTreasure(hunt);
   if(write(f, new, sizeof(*new))==-1)
-    {
-      perror("Error at writing a new feature\n");
-      if(close(f)==-1)
-      {
-        perror("Error closing the file\n");
-        exit(EXIT_FAILURE);
-      }
-      exit(EXIT_FAILURE);
-    }
-  if(close(f)==-1)
   {
-    perror("Error closing the file\n");
+    perror("Error at writing a new feature");
+    safe_close(f);
+    free(new);
     exit(EXIT_FAILURE);
   }
-  int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-  if(lo==-1)
-    {
-      perror("Error at opening log file\n");
-      free(new);
-      exit(EXIT_FAILURE);
-    }
+  safe_close(f);
+  int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
   char info[256];
   sprintf(info,  "--add: ID:%d User:%s Latitude:%f Longitude:%f Clue:%s Value:%d\n", new->id, new->user, new->gps.latitude, new->gps.longitude, new->clue, new->value);
   if(write(lo, info, strlen(info))==-1)
   {
-    perror("Error writing to log file\n");
+    perror("Error writing to log file");
     free(new);
-    if(close(lo)==-1)
-    {
-      perror("Error closing the file\n");
-      exit(EXIT_FAILURE);
-    }
+    safe_close(f);
     exit(EXIT_FAILURE);
   }
-  if(close(lo)==-1)
-  {
-    perror("Error closing the file\n");
-    exit(EXIT_FAILURE);
-  }
+  safe_close(lo);
   free(new);
   if(lstat(link, &st)==-1)
   {
     if(symlink(log, link)==-1)
 	  {
-	    perror("Couldn't create a symlink\n");
+	    perror("Couldn't create a symlink");
 	    exit(EXIT_FAILURE);
 	  }
   }
@@ -252,7 +248,7 @@ void add(char *hunt)
   {
     if(S_ISLNK(st.st_mode))
 	  {
-	    write(1, "Symbolic link already exists\n", strlen("Symbolic link already exists\n"));
+	    printf("Symbolic link already exists\n");
 	  }
   }
   printf("Treasure added\n");
@@ -266,255 +262,131 @@ void list(char *hunt)
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
   struct stat st,st1, st2;
-  if(lstat(hunt, &st))
-    {
-      perror("Error at finding the path\n");
-      exit(EXIT_FAILURE);
-    }
-  else
-    if(S_ISDIR(st.st_mode)==0)
-      {
-	      perror("It isn't a directory\n");
-	      exit(EXIT_FAILURE);
-      }
-  write(1, "Hunt: ", 6);
-  write(1, hunt, strlen(hunt));
-  if(lstat(file, &st1))
-    {
-      perror("Error at finding the treasure file\n");
-      exit(EXIT_FAILURE);
-    }
-  else
-    if(S_ISREG(st1.st_mode)==0)
-      {
-	      perror("It isn't a regular file\n");
-	      exit(EXIT_FAILURE);
-      }
-  if(lstat(log, &st2))
-    {
-      perror("Error at finding the treasure file\n");
-      exit(EXIT_FAILURE);
-    }
-  else
-    if(S_ISREG(st2.st_mode)==0)
-      {
-	      perror("It isn't a regular file\n");
-	      exit(EXIT_FAILURE);
-      }
-  char size[64];
-  
-  snprintf(size, sizeof(size), "\nTotal size: %ld\n", st1.st_size+st2.st_size);
-  write(1, size, strlen(size));
-  char modification[64];
-  snprintf(modification, sizeof(modification), "Last modification: %s", ctime(&st.st_mtime));
-  write(1, modification, strlen(modification));
+  ensure_type(hunt, S_IFDIR);
+  printf("Name: %s\n", hunt);
+  ensure_type(file, S_IFREG);
+  ensure_type(log, S_IFREG);
+  lstat(hunt, &st);
+  lstat(file, &st1);
+  lstat(log, &st2);
+  printf("Total size: %ld\n", st1.st_size+st2.st_size);
+  printf("Last modification: %s", ctime(&st.st_mtime));
   TREASURE t;
-  int f=open(file, O_RDONLY, 0777);
-  if(f==-1)
-    {
-      perror("Error at opening a treasure file\n");
-      exit(EXIT_FAILURE);
-    }
+  int f=safe_open(file, O_RDONLY, 0777);
   int b;
   while((b=read(f, &t, sizeof(TREASURE)))==sizeof(TREASURE))
-    {
-      char info[256];
-      snprintf(info, sizeof(info), "ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
-      write(1, info, strlen(info));
-    }
-  if(close(f)==-1)
   {
-    perror("Error closing the file\n");
-    exit(EXIT_FAILURE);
+    printf("ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
   }
+  safe_close(f);
   char aux[128];
   snprintf(aux, sizeof(aux), "--list: listed all the treasures from %s\n", hunt);
-  int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-  if(lo==-1)
-    {
-      perror("Error at opening log file\n");
-      exit(EXIT_FAILURE);
-    }
+  int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
   write(lo, aux, strlen(aux));
   printf("%s listed\n", hunt);
-  if(close(lo)==-1)
-  {
-    perror("Error closing the file\n");
-    exit(EXIT_FAILURE);
-  }
+  safe_close(lo);
 }
 
 //view the treasure with the specified id from the hunt
 //logs the operation in logged_hunt
 void view(char *hunt, char *id)
 {
-    if(atoi(id)==0)
+  char *endptr;
+  long ID = strtol(id, &endptr, 10);
+  if (*endptr != '\0') 
+  {
+    fprintf(stderr, "Not a valid id");
+    exit(EXIT_FAILURE);
+  } 
+  char file[128];
+  ensure_type(hunt, S_IFDIR);
+  int found_id=0;
+  snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
+  int f=safe_open(file, O_RDONLY, 0777);
+  TREASURE t;
+  while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE) && !found_id)
+  {
+    if(t.id==ID)
     {
-        perror("Not a valid id\n");
-        exit(EXIT_FAILURE);
+      found_id=1;
+      printf("ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
     }
-    int ID=atoi(id);
-    char file[128];
-    struct stat st;
-    if(lstat(hunt, &st))
-    { 
-        perror("Error at finding the path\n");
-        exit(EXIT_FAILURE);
-    }
-    else 
-    {
-        if(S_ISDIR(st.st_mode)==0)
-        {
-        perror("Not a directory\n");
-        exit(EXIT_FAILURE);
-        }
-    }
-    int found_id=0;
-    snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-    int f=open(file, O_RDONLY, 0777);
-    if(f==-1)
-    {
-        perror("Couldn't open the file\n");
-        exit(EXIT_FAILURE);
-    }
-    TREASURE t;
-    while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE) && !found_id)
-    {
-        if(t.id==ID)
-        {
-          found_id=1;
-          char info[256];
-          snprintf(info, sizeof(info), "ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
-          write(1, info, strlen(info));
-        }
-    }
-    if(close(f)==-1)
-    {
-      perror("Error closing the file");
-      exit(EXIT_FAILURE);
-    }
-    if(found_id==0)
-    {
-        write(1, "The treasure with this id was not found\n", 40);
-        exit(EXIT_FAILURE);
-    }
-    char log[128], aux[128];
-    snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
-    snprintf(aux, sizeof(aux), "--view: viewed the treasure with the %d id\n", ID);
-    int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-    if(lo==-1)
-    {
-        perror("Error at opening log file\n");
-        exit(EXIT_FAILURE);
-    }
-    write(lo, aux, strlen(aux));
-    printf("Viewed the treasure with the id=%d in the %s\n", ID, hunt);
-    if(close(lo)==-1)
-    {
-      perror("Error closing the file\n");
-      exit(EXIT_FAILURE);
-    }
+  }
+  safe_close(f);
+  if(found_id==0)
+  {
+    printf("The treasure with this id was not found\n");
+    exit(EXIT_FAILURE);
+  }
+  char log[128], aux[128];
+  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
+  snprintf(aux, sizeof(aux), "--view: viewed the treasure with the %ld id\n", ID);
+  int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
+  write(lo, aux, strlen(aux));
+  printf("Viewed the treasure with the id=%ld in the %s\n", ID, hunt);
+  safe_close(lo);
 }
 
 //removes the treasure with the specified id from the hunt(rewrites the treasures.dat file)
 //logs the operation in logged_hunt
 void remove_treasure(char *hunt, char *id)
 {
-    if(atoi(id)==0)
+  char *endptr;
+  long ID = strtol(id, &endptr, 10);
+  if (*endptr != '\0') 
+  {
+    fprintf(stderr, "Not a valid id");
+    exit(EXIT_FAILURE);
+  }
+  char file[128], aux[128];
+  ensure_type(hunt, S_IFDIR);
+  snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
+  snprintf(aux, sizeof(aux), "%s/aux.dat", hunt);
+  int f=safe_open(file, O_RDONLY, 0777);
+  int a=safe_open(aux, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  TREASURE t;
+  int found_id=0;
+  while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
+  {
+    if(t.id==ID)
     {
-        perror("Not a valid id\n");
-        exit(EXIT_FAILURE);
+      found_id=1;
+      continue;
     }
-    int ID=atoi(id);
-    char file[128], aux[128];
-    struct stat st;
-    if(lstat(hunt, &st))
-    { 
-        perror("Error at finding the path\n");
-        exit(EXIT_FAILURE);
-    }
-    else 
+    write(a, &t, sizeof(TREASURE));
+  }
+  safe_close(f);
+  safe_close(a);
+  if(found_id)
+  {
+    if(unlink(file))
     {
-        if(S_ISDIR(st.st_mode)==0)
-        {
-        perror("Not a directory\n");
-        exit(EXIT_FAILURE);
-        }
-    }
-    snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
-    snprintf(aux, sizeof(aux), "%s/aux.dat", hunt);
-    int f=open(file, O_RDONLY, 0777);
-    if(f==-1)
-    {
-        perror("Couldn't open the file\n");
-        exit(EXIT_FAILURE);
-    }
-    int a=open(aux, O_WRONLY | O_CREAT | O_TRUNC, 0777);
-    if(a==-1)
-    {
-        perror("Couldn't open the auxiliar file\n");
-        exit(EXIT_FAILURE);
-    }
-    TREASURE t;
-    int found_id=0;
-    while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
-    {
-        if(t.id==ID)
-        {
-          found_id=1;
-          continue;
-        }
-        write(a, &t, sizeof(TREASURE));
-    }
-    if(close(f)==-1)
-    {
-      perror("Error closing the file\n");
+      perror("Couldn't remove the old file");
       exit(EXIT_FAILURE);
     }
-    if(close(a)==-1)
+    if(rename(aux, file))
     {
-      perror("Error closing the file\n");
+      perror("Couldn't rename the auxiliary file");
       exit(EXIT_FAILURE);
     }
-    if(found_id)
+  }
+  else
+  {
+    if(unlink(aux))
     {
-      if(unlink(file))
-      {
-        perror("Couldn't remove the old file\n");
-        exit(EXIT_FAILURE);
-      }
-      if(rename(aux, file))
-      {
-        perror("Couldn't rename the auxiliary file\n");
-        exit(EXIT_FAILURE);
-      }
-    }
-    else
-    {
-      if(unlink(aux))
-      {
-        perror("Couldn't remove the auxiliary file\n");
-        exit(EXIT_FAILURE);
-      }
-      write(1, "The treasure with this id was not found\n", 40);
-      return;
-    }
-   char log[128], info[128];
-   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
-   snprintf(info, sizeof(info), "--remove_treasure: removed the treasure with the %d id from the %s hunt\n", ID, hunt);
-   int lo=open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-   if(lo==-1)
-    {
-        perror("Error at opening log file\n");
-        exit(EXIT_FAILURE);
-    }
-   write(lo, info, strlen(info));
-   printf("Removed the treasure with the id=%d from the %s\n", ID, hunt);
-   if(close(lo)==-1)
-   {
-      perror("Error closing the file\n");
+      perror("Couldn't remove the auxiliary file");
       exit(EXIT_FAILURE);
-   }
+    }
+    printf("The treasure with this id was not found\n");
+    return;
+  }
+  char log[128], info[128];
+  snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
+  snprintf(info, sizeof(info), "--remove_treasure: removed the treasure with the %ld id from the %s hunt\n", ID, hunt);
+  int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
+  write(lo, info, strlen(info));
+  printf("Removed the treasure with the id=%ld from the %s\n", ID, hunt);
+  safe_close(lo);
 }
 
 //remove the hunt and all the files
@@ -524,65 +396,28 @@ void remove_hunt(char *hunt)
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
   snprintf(link, sizeof(link), "logged_hunt-%s", hunt);
-  struct stat st;
-  if(lstat(hunt, &st))
-  {
-    perror("Error at finding the directory path\n");
-    exit(EXIT_FAILURE);
-  }
-  if(S_ISDIR(st.st_mode)==0)
-  {
-    perror("Not a directory\n");
-    exit(EXIT_FAILURE);
-  }
-  if(lstat(file, &st))
-  {
-    perror("Error at finding the file path\n");
-    exit(EXIT_FAILURE);
-  }
-  if(S_ISREG(st.st_mode)==0)
-  {
-    perror("Not a regular file\n");
-    exit(EXIT_FAILURE);
-  }
+  ensure_type(hunt, S_IFDIR);
+  ensure_type(file, S_IFREG);
   if(unlink(file))
   {
-    perror("Error at deleting the file\n");
+    perror("Error at deleting the file");
     exit(EXIT_FAILURE);
   }
-  if(lstat(link, &st))
-  {
-    perror("Error at finding the link path\n");
-    exit(EXIT_FAILURE);
-  }
-  if(S_ISLNK(st.st_mode)==0)
-  {
-    perror("Not a link\n");
-    exit(EXIT_FAILURE);
-  }
+  ensure_type(link, S_IFLNK);
   if(unlink(link))
   {
-    perror("Error at deleting the link\n");
+    perror("Error at deleting the link");
     exit(EXIT_FAILURE);
   }
-  if(lstat(log, &st))
-  {
-    perror("Error at finding the log path\n");
-    exit(EXIT_FAILURE);
-  }
-  if(S_ISREG(st.st_mode)==0)
-  {
-    perror("Not a regular file\n");
-    exit(EXIT_FAILURE);
-  }
+  ensure_type(log, S_IFREG);
   if(unlink(log))
   {
-    perror("Error at deleting the log file\n");
+    perror("Error at deleting the log file");
     exit(EXIT_FAILURE);
   }
   if(rmdir(hunt))
   {
-    perror("Error at deleting the directory\n");
+    perror("Error at deleting the directory");
     exit(EXIT_FAILURE);
   }
   printf("%s removed\n", hunt);
@@ -590,22 +425,25 @@ void remove_hunt(char *hunt)
 
 int main(int argc, char *argv[])
 {
-  if(argc<2){
-    perror("Not enough arguments\n");
+  if(argc<2)
+  {
+    fprintf(stderr, "Not enough arguments\n");
     exit(EXIT_FAILURE);
   }
-  if(strcmp(argv[1], "--add")==0){
+  if(strcmp(argv[1], "--add")==0)
+  {
     if(argc<3)
     {
-      perror("You need to introduce a hunt id\n");
+      fprintf(stderr, "You need to introduce a hunt id\n");
       exit(EXIT_FAILURE);
     }
-    else {
+    else 
+    {
       if(argc==3)
-            add(argv[2]);
+        add(argv[2]);
       else
       {
-        perror("Too many arguments\n");
+        fprintf(stderr, "Too many arguments\n");
         exit(EXIT_FAILURE);
       }
     }
@@ -614,18 +452,21 @@ int main(int argc, char *argv[])
     {
       if(strcmp(argv[1], "--list")==0)
 	    {
-	      if(argc<3){
-	        perror("You need to introduce a hunt id\n");
+	      if(argc<3)
+        {
+	        fprintf(stderr, "You need to introduce a hunt id\n");
 	        exit(EXIT_FAILURE);
 	      }
-        else 
+        else
+        {
           if(argc==3)
 	            list(argv[2]);
           else
           {
-            perror("Too many arguments\n");
+            fprintf(stderr, "Too many arguments\n");
             exit(EXIT_FAILURE);
           }
+        }
 	    }
       else
       {
@@ -633,57 +474,66 @@ int main(int argc, char *argv[])
         {
           if(argc<4)
           {
-            perror("You need to introduce a hunt id AND an id\n");
+            fprintf(stderr, "You need to introduce a hunt id AND an id\n");
             exit(EXIT_FAILURE);
           }
           else
+          {
             if(argc==4)
               view(argv[2], argv[3]);
             else
             {
-              perror("Too many arguments\n");
+              fprintf(stderr, "Too many arguments\n");
               exit(EXIT_FAILURE);
             }
+          }
         }
         else
         {
-            if(strcmp(argv[1], "--remove_treasure")==0)
+          if(strcmp(argv[1], "--remove_treasure")==0)
+          {
+            if(argc<4)
             {
-                if(argc<4)
-                {
-                    perror("You need to introduce a hunt id AND an id\n");
-                    exit(EXIT_FAILURE);
-                }
-                else
-                    if(argc==4)
-                        remove_treasure(argv[2], argv[3]);
-                    else
-                    {
-                        perror("Too many arguments\n");
-                        exit(EXIT_FAILURE);
-                    }
-            }
-            else{
-              if(strcmp(argv[1], "--remove_hunt")==0)
-              {
-                if(argc<3){
-                  perror("You need to introduce a hunt id\n");
-                  exit(EXIT_FAILURE);
-                }
-                else if(argc==3)
-                  remove_hunt(argv[2]);
-                  else
-                  {
-                    perror("Too many arguments\n");
-                    exit(EXIT_FAILURE);
-                  }
+              fprintf(stderr, "You need to introduce a hunt id AND an id\n");
+              exit(EXIT_FAILURE);
             }
             else
             {
-              perror("Invalid argument\n");
+              if(argc==4)
+                remove_treasure(argv[2], argv[3]);
+              else
+              {
+                fprintf(stderr, "Too many arguments\n");
+                exit(EXIT_FAILURE);
+              }
             }
+          }
+          else
+          {
+            if(strcmp(argv[1], "--remove_hunt")==0)
+            {
+              if(argc<3)
+              {
+                fprintf(stderr, "You need to introduce a hunt id\n");
+                exit(EXIT_FAILURE);
+              }
+              else 
+              {
+                if(argc==3)
+                remove_hunt(argv[2]);
+                else
+                {
+                  fprintf(stderr, "Too many arguments\n");
+                  exit(EXIT_FAILURE);
+                }
+              }
+            }
+            else
+            {
+              fprintf(stderr, "Invalid argument\n");
+            }
+          }
         }
-      }
       }
     }
   return 0;
