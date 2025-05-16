@@ -1,4 +1,5 @@
 SO project  
+
 Phase 1  
 Exemple de rulare:  
 ./treasure_manager --add Hunt1 (dupa care se cer date de la tastatura si sunt verificate)  
@@ -12,4 +13,7 @@ list_hunts
 list_treasures Hunt1  
 view_treasure Hunt1 2  
 stop_monitor  
-exit
+exit  
+
+Phase 3  
+calculate_score (program extern care este apelat din treasure_hub)
