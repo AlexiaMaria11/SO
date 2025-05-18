@@ -1,0 +1,10 @@
+--add: ID:2 User:Alexandra Latitude:4.500000 Longitude:7.600000 Clue:First clue Value:8
+--add: ID:1 User:Alexandra Latitude:7.900000 Longitude:1.200000 Clue:second clue Value:6
+--add: ID:7 User:Andreea Latitude:7.800000 Longitude:5.600000 Clue:third clue Value:5
+--list: listed all the treasures from Hunt1
+--add: ID:5 User:Alex Latitude:4.500000 Longitude:2.100000 Clue:clue Value:7
+--list: listed all the treasures from Hunt1
+--view: viewed the treasure with the 5 id
+--remove_treasure: removed the treasure with the 5 id from the Hunt1 hunt
+--list: listed all the treasures from Hunt1
+--view: viewed the treasure with the 1 id

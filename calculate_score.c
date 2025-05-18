@@ -26,12 +26,18 @@ typedef struct {
     int score;
 } USER_SCORE;
 
+//calculates the score for a hunt
 void calculate_scores(char *hunt) 
 {
     struct stat st;
-    if (lstat(hunt, &st)) 
+    if(hunt==NULL)
     {
-        fprintf(stderr, "Error at finding the path\n");
+        fprintf(stderr, "Invalid hunt\n");
+        exit(EXIT_FAILURE);
+    }
+    if (lstat(hunt, &st)==-1) 
+    {
+        perror(hunt);
         exit(EXIT_FAILURE);
     } 
     else 
@@ -47,15 +53,20 @@ void calculate_scores(char *hunt)
     int f = open(file, O_RDONLY, 0777);
     if (f == -1) 
     {
-        perror("Open");
+        perror("Open file");
         exit(EXIT_FAILURE);
     }
 
     USER_SCORE *users = NULL;
-    int count = 0, size = 0;
+    int count = 0, size = 0, b=0;
     TREASURE t;
-    while (read(f, &t, sizeof(TREASURE)) == sizeof(TREASURE)) 
+    while ((b=read(f, &t, sizeof(TREASURE))) >0) 
     {
+        if(b!=sizeof(TREASURE))
+        {
+            fprintf(stderr, "Partial read\n");
+            exit(EXIT_FAILURE);
+        }
         int found = 0;
         for (int i = 0; i < count; i++) 
         {
@@ -72,26 +83,39 @@ void calculate_scores(char *hunt)
             {
                 if (size == 0) size = 8;
                 else size *= 2;
-                users = realloc(users, size * sizeof(USER_SCORE));
-                if (users == NULL) 
+                USER_SCORE *temp = realloc(users, size * sizeof(USER_SCORE));
+                if (temp == NULL) 
                 {
                     perror("Error at users realloc");
+                    free(users); 
                     if (close(f) == -1) 
                     {
-                        perror("Close");
-                        exit(EXIT_FAILURE);
+                        perror("Close file");
                     }
                     exit(EXIT_FAILURE);
                 }
+                users = temp;
+
             }
             strcpy(users[count].user, t.user);
             users[count].score = t.value;
             count++;
         }
     }
+    if(b==-1)
+    {
+        perror("Read error");
+        free(users);
+        if (close(f) == -1) 
+        {
+            perror("Close file");
+            exit(EXIT_FAILURE);
+        }
+        exit(EXIT_FAILURE);
+    }
     if (close(f) == -1) 
     {
-        perror("Close");
+        perror("Close file");
         exit(EXIT_FAILURE);
     }
 
@@ -123,6 +147,10 @@ int main(void)
             calculate_scores(d->d_name);
         }
     }
-    closedir(dir);
+    if(closedir(dir)==-1)
+    {
+        perror("Close directory");
+        exit(EXIT_FAILURE);
+    }
     return 0;
 }

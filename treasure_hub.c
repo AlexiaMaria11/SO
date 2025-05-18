@@ -26,14 +26,14 @@ int running=0, stopping=0, mpid=-1;
 
 void read_from_pipe_and_print(int fd) 
 {
-  char buffer[256];
-  int bytesRead;
-  while ((bytesRead = read(fd, buffer, 255)) > 0)
+  char buff[256];
+  int b;
+  while ((b = read(fd, buff, 255)) > 0)
   {
-    buffer[bytesRead] = '\0';
-    printf("%s", buffer);
+    buff[b] = '\0';
+    printf("%s", buff);
   }
-  if (bytesRead == -1)
+  if (b == -1)
   {
     perror("Error reading from pipe");
     exit(EXIT_FAILURE);
@@ -46,21 +46,21 @@ int countTreasures(char *hunt)
   char file[128];
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
   struct stat st;
-  if(lstat(hunt, &st))
+  if(lstat(hunt, &st)==-1)
   {
-    perror("Error at finding the path\n");
+    perror(hunt);
     exit(EXIT_FAILURE);
   }
   else
   if(S_ISDIR(st.st_mode)==0)
     {
-	    perror("It isn't a directory\n");
+	    fprintf(stderr, "It isn't a directory\n");
 	    exit(EXIT_FAILURE);
     }
   int f=open(file, O_RDONLY);
   if(f==-1)
   {
-    perror("Open");
+    perror("Open file");
     exit(EXIT_FAILURE);
   }
   int b, c=0;
@@ -71,16 +71,17 @@ int countTreasures(char *hunt)
   }
   if (b == -1) 
   {
-    perror("Read");
+    perror("Read treasures");
     if(close(f)==-1)
     {
-      perror("Close");
+      perror("Close file");
       exit(EXIT_FAILURE);
     }
+    exit(EXIT_FAILURE);
   }
   if(close(f)==-1)
   {
-    perror("Close");
+    perror("Close file");
     exit(EXIT_FAILURE);
   }
   return c;
@@ -110,7 +111,11 @@ void list_hunts()
   }
   if(c==0)
     printf("No hunt found\n");
-  closedir(dir);
+  if(closedir(dir)==-1)
+  {
+    perror("Close directroy");
+    exit(EXIT_FAILURE);
+  }
 }
 
 //handler for SIGUSR1 (different actions based on the input from the terminal)
@@ -120,23 +125,23 @@ void handler1(int signal)
   int f=open("command.txt", O_RDONLY);
   if(f==-1)
   {
-    perror("Open");
+    perror("Open file");
     exit(EXIT_FAILURE);
   }
   int b=read(f, aux, sizeof(aux));
   if(b==-1)
   {
-    perror("Read");
+    perror("Read treasures");
     if(close(f)==-1)
     {
-      perror("Close");
+      perror("Close file");
       exit(EXIT_FAILURE);
     }
     exit(EXIT_FAILURE);
   }
   else if(b==0)
   {
-    perror("End of file\n");
+    perror("End of file");
     if(close(f)==-1)
     {
       perror("Close");
@@ -147,7 +152,7 @@ void handler1(int signal)
   aux[b]='\0';
   if(close(f)==-1)
   {
-    perror("Close");
+    perror("Close file");
     exit(EXIT_FAILURE);
   }
   char *p=strtok(aux, " \n");
@@ -274,7 +279,7 @@ void handler1(int signal)
 void handler2(int signal)
 {
   printf("Monitor is stopping\n");
-  usleep(10000000);
+  usleep(5000000);
   exit(0);
 }
 
@@ -304,7 +309,6 @@ void handler3(int signal)
     }
   }
 }
-
 
 //starts the monitor and handles the commands with signals
 void start_monitor()
@@ -350,10 +354,19 @@ void command(char *command_name)
   int f=open("command.txt", O_WRONLY | O_CREAT | O_TRUNC, 0777);
   if(f==-1)
   {
-    perror("Open");
+    perror("Open file");
     exit(EXIT_FAILURE);
   }
-  write(f, command_name, strlen(command_name));
+  if(write(f, command_name, strlen(command_name))==-1)
+  {
+    perror("Error at writing a command");
+    if (close(f) == -1) 
+    {
+      perror("Close file");
+      exit(EXIT_FAILURE);
+    }
+    exit(EXIT_FAILURE);
+  }
   kill(mpid, SIGUSR1);
   sleep(5);
   close(f);

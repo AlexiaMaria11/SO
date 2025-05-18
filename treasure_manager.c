@@ -40,24 +40,39 @@ void safe_close(int fd)
   }
 }
 
-void ensure_type(char *path, mode_t type) 
+void ensure_type(char *path, int type) 
 {
-  struct stat st;
-  if (lstat(path, &st) == -1) 
-  {
-    perror(path);
-    exit(EXIT_FAILURE);
-  }
-  if ((st.st_mode & S_IFMT) != type)
-  {
-    fprintf(stderr, "%s is not a valid %s\n", path,
+    struct stat st;
+    if (lstat(path, &st) == -1) 
+    {
+        perror(path);
+        exit(EXIT_FAILURE);
+    }
+    int is_type = 0;
+    switch(type) 
+    {
+      case S_IFDIR:
+        is_type = S_ISDIR(st.st_mode);
+        break;
+      case S_IFREG:
+        is_type = S_ISREG(st.st_mode);
+        break;
+      case S_IFLNK:
+        is_type = S_ISLNK(st.st_mode);
+        break;
+      default:
+        fprintf(stderr, "Unsupported type\n");
+        exit(EXIT_FAILURE);
+    }
+    if (!is_type) 
+    {
+      fprintf(stderr, "%s is not a valid %s\n", path,
         (type == S_IFDIR) ? "directory" :
         (type == S_IFREG) ? "regular file" :
         (type == S_IFLNK) ? "symbolic link" : "type");
-    exit(EXIT_FAILURE);
-  }
+      exit(EXIT_FAILURE);
+    }
 }
-
 
 //removes the \n character if it exists
 //retunrs the length of the string
@@ -86,6 +101,7 @@ TREASURE* newTreasure(char *hunt)
     perror("Error allocating space for a new treasure");
     exit(EXIT_FAILURE);
   }
+  memset(new, 0, sizeof(TREASURE));
   char buff_in[64];
   
   printf("Treasure ID: ");
@@ -100,12 +116,24 @@ TREASURE* newTreasure(char *hunt)
   }
 
   //unique ID check
-  TREASURE t;
+  TREASURE t={0};
   char file[128];
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
   int f=safe_open(file, O_RDONLY, 0777);
-  while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
+  int b=0;
+  while((b=read(f, &t, sizeof(TREASURE)))>0)
   {
+    if(b==-1)
+    {
+      perror("Read error");
+      exit(EXIT_FAILURE);
+    }
+    if(b==0) break;
+    if(b!=sizeof(TREASURE))
+    {
+      fprintf(stderr, "Partial read\n");
+      exit(EXIT_FAILURE);
+    }
     if(t.id==val)
     {
       fprintf(stderr, "This treasure ID is already in the file\n");
@@ -114,7 +142,7 @@ TREASURE* newTreasure(char *hunt)
       exit(EXIT_FAILURE);
     }
   }
-  close(f);
+  safe_close(f);
   new->id=val;
   memset(buff_in, 0, sizeof(buff_in));
 
@@ -219,14 +247,14 @@ void add(char *hunt)
   if(write(f, new, sizeof(*new))==-1)
   {
     perror("Error at writing a new feature");
-    safe_close(f);
     free(new);
+    safe_close(f);
     exit(EXIT_FAILURE);
   }
   safe_close(f);
   int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
   char info[256];
-  sprintf(info,  "--add: ID:%d User:%s Latitude:%f Longitude:%f Clue:%s Value:%d\n", new->id, new->user, new->gps.latitude, new->gps.longitude, new->clue, new->value);
+  snprintf(info, sizeof(info), "--add: ID:%d User:%s Latitude:%f Longitude:%f Clue:%s Value:%d\n", new->id, new->user, new->gps.latitude, new->gps.longitude, new->clue, new->value);
   if(write(lo, info, strlen(info))==-1)
   {
     perror("Error writing to log file");
@@ -246,10 +274,24 @@ void add(char *hunt)
   }
   else
   {
-    if(S_ISLNK(st.st_mode))
-	  {
-	    printf("Symbolic link already exists\n");
-	  }
+    if (!S_ISLNK(st.st_mode)) 
+    {
+      if (unlink(link) == -1) 
+      {
+        perror("Couldn't remove non-symlink file");
+        exit(EXIT_FAILURE);
+      }
+      if (symlink(log, link) == -1) 
+      {
+        perror("Couldn't create a symlink");
+        exit(EXIT_FAILURE);
+      }
+      printf("Non-symlink file replaced with symbolic link\n");
+    } 
+    else 
+    {
+        printf("Symbolic link already exists\n");
+    }
   }
   printf("Treasure added\n");
 }
@@ -271,18 +313,34 @@ void list(char *hunt)
   lstat(log, &st2);
   printf("Total size: %ld\n", st1.st_size+st2.st_size);
   printf("Last modification: %s", ctime(&st.st_mtime));
-  TREASURE t;
+  TREASURE t={0};
   int f=safe_open(file, O_RDONLY, 0777);
   int b;
-  while((b=read(f, &t, sizeof(TREASURE)))==sizeof(TREASURE))
+  while((b=read(f, &t, sizeof(TREASURE)))>0)
   {
+    if(b==-1)
+    {
+      perror("Read error");
+      exit(EXIT_FAILURE);
+    }
+    if(b==0) break;
+    if(b!=sizeof(TREASURE))
+    {
+      fprintf(stderr, "Partial read\n");
+      exit(EXIT_FAILURE);
+    }
     printf("ID: %d - User: %s - Latitude: %f - Longitude: %f - Clue: %s - Value: %d\n", t.id, t.user, t.gps.latitude, t.gps.longitude, t.clue, t.value);
   }
   safe_close(f);
   char aux[128];
   snprintf(aux, sizeof(aux), "--list: listed all the treasures from %s\n", hunt);
   int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-  write(lo, aux, strlen(aux));
+  if(write(lo, aux, strlen(aux))==-1)
+  {
+    perror("Error writing to log file");
+    safe_close(f);
+    exit(EXIT_FAILURE);
+  }
   printf("%s listed\n", hunt);
   safe_close(lo);
 }
@@ -303,9 +361,21 @@ void view(char *hunt, char *id)
   int found_id=0;
   snprintf(file, sizeof(file), "%s/treasures.dat", hunt);
   int f=safe_open(file, O_RDONLY, 0777);
-  TREASURE t;
-  while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE) && !found_id)
+  TREASURE t={0};
+  int b=0;
+  while((b=read(f, &t, sizeof(TREASURE)))>0 && !found_id)
   {
+    if(b==-1)
+    {
+      perror("Read error");
+      exit(EXIT_FAILURE);
+    }
+    if(b==0) break;
+    if(b!=sizeof(TREASURE))
+    {
+      fprintf(stderr, "Partial read\n");
+      exit(EXIT_FAILURE);
+    }
     if(t.id==ID)
     {
       found_id=1;
@@ -322,7 +392,12 @@ void view(char *hunt, char *id)
   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
   snprintf(aux, sizeof(aux), "--view: viewed the treasure with the %ld id\n", ID);
   int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-  write(lo, aux, strlen(aux));
+  if(write(lo, aux, strlen(aux))==-1)
+  {
+    perror("Error writing to log file");
+    safe_close(f);
+    exit(EXIT_FAILURE);
+  }
   printf("Viewed the treasure with the id=%ld in the %s\n", ID, hunt);
   safe_close(lo);
 }
@@ -344,16 +419,32 @@ void remove_treasure(char *hunt, char *id)
   snprintf(aux, sizeof(aux), "%s/aux.dat", hunt);
   int f=safe_open(file, O_RDONLY, 0777);
   int a=safe_open(aux, O_WRONLY | O_CREAT | O_TRUNC, 0777);
-  TREASURE t;
-  int found_id=0;
-  while(read(f, &t, sizeof(TREASURE))==sizeof(TREASURE))
+  TREASURE t={0};
+  int found_id=0, b=0;
+  while((b=read(f, &t, sizeof(TREASURE)))>0)
   {
+    if(b==-1)
+    {
+      perror("Read error");
+      exit(EXIT_FAILURE);
+    }
+    if(b==0) break;
+    if(b!=sizeof(TREASURE))
+    {
+      fprintf(stderr, "Partial read\n");
+      exit(EXIT_FAILURE);
+    }
     if(t.id==ID)
     {
       found_id=1;
       continue;
     }
-    write(a, &t, sizeof(TREASURE));
+    if(write(a, &t, sizeof(TREASURE))==-1)
+    {
+      perror("Error writing to log file");
+      safe_close(f);
+      exit(EXIT_FAILURE);
+    }
   }
   safe_close(f);
   safe_close(a);
@@ -384,7 +475,12 @@ void remove_treasure(char *hunt, char *id)
   snprintf(log, sizeof(log), "%s/logged_hunt", hunt);
   snprintf(info, sizeof(info), "--remove_treasure: removed the treasure with the %ld id from the %s hunt\n", ID, hunt);
   int lo=safe_open(log, O_WRONLY | O_CREAT | O_APPEND, 0777);
-  write(lo, info, strlen(info));
+  if(write(lo, info, strlen(info))==-1)
+  {
+    perror("Error writing to log file");
+    safe_close(f);
+    exit(EXIT_FAILURE);
+  }
   printf("Removed the treasure with the id=%ld from the %s\n", ID, hunt);
   safe_close(lo);
 }
