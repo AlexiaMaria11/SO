@@ -16,5 +16,5 @@ stop_monitor
 exit  
 
 **Phase 3**  
-calculate_score (program extern care se apeleaza din treasure_hub)
+calculate_score (program extern care se apeleaza din treasure_hub)  
 utilizare pipe-uri
